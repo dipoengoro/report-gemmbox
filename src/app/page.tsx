@@ -32,24 +32,24 @@ export default function ReportPage() {
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
-        // [Atas, Kanan, Bawah, Kiri] - Margin diperkecil agar tidak tebal
-        margin:       [15, 5, 15, 5], 
+        // [Atas, Kanan, Bawah, Kiri] - Margin diperkecil agar lega di lanskap
+        margin:       [5, 5, 5, 5], 
         filename:     fileName,
         image:        { type: 'jpeg', quality: 1 }, // Kualitas digas ke 100%
         html2canvas:  { 
           scale: 2, 
           useCORS: true,
-          windowWidth: 1024 // Kunci paksa lebar kanvas agar tidak pecah/sesak
+          windowWidth: 1024 // Kunci lebar kanvas agar pas dengan layout 1024px
         },
         jsPDF:        { 
           unit: 'mm', 
-          format: 'a4', // Kita pakai A4 biasa
-          orientation: 'portrait' // Memanjang ke bawah agar natural
+          format: 'a4', // Ukuran kertas A4
+          orientation: 'landscape' // <--- KEMBALI KE LANSKAP (MEMANJANG KESAMPING)
         },
-        // INI KUNCI UTAMANYA: Mengajarkan html2pdf untuk tidak menebas baris tabel!
+        // Aturan Page Break: Cegah baris tabel (tr) terpotong
         pagebreak:    { 
           mode: ['css', 'legacy'], 
-          avoid: ['tr', '.print-avoid-break'] // tr = Table Row
+          avoid: ['tr', '.print-avoid-break'] 
         }
       };
 
