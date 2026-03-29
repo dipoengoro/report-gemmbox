@@ -20,7 +20,6 @@ export default function ReportPage() {
   }, []);
 
   // Fungsi untuk Ekspor PDF
-  // Fungsi untuk Ekspor PDF
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
@@ -29,23 +28,55 @@ export default function ReportPage() {
       const html2pdf = (await import("html2pdf.js")).default;
       const element = document.getElementById("report-container");
       
-      // PERBAIKAN ELEMENT: Cegah error jika elemen null
       if (!element) {
         alert("Gagal memuat area laporan.");
         setIsExporting(false);
         return;
       }
 
-      // PERBAIKAN OPT: Tambahkan ": any" agar TypeScript berhenti rewel
+      const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
         margin:       10,
-        filename:     `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`,
+        filename:     fileName,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
         jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
       };
 
-      await html2pdf().set(opt).from(element).save();
+      // 1. Buat PDF dalam bentuk "Blob" (Data mentah di memori)
+      const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+      // 2. Gunakan fitur Share Bawaan HP (Sangat ampuh di Telegram Mini App)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        
+        // Cek apakah perangkat mendukung share file
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: 'Laporan Keuangan Gemmbox',
+              files: [file]
+            });
+          } catch (shareError) {
+            console.log("Share dibatalkan oleh pengguna:", shareError);
+          }
+        } else {
+          // Fallback 1: Jika HP tidak mendukung share file, buka di tab baru
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          window.open(pdfUrl, '_blank');
+        }
+      } else {
+        // Fallback 2: Jika diakses via PC/Laptop biasa, gunakan download normal
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(pdfUrl);
+      }
+
     } catch (error) {
       console.error("Gagal mengekspor PDF:", error);
       alert("Terjadi kesalahan saat mengekspor PDF.");
