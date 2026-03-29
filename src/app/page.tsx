@@ -1,101 +1,289 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Download, Settings2, Loader2, AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
+import { useTelegramAuth } from "@/hooks/useTelegramAuth";
+import { useTransactions } from "@/hooks/useTransactions";
+import { account } from "@/lib/appwrite";
+import { BarChart, DonutChart, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge } from "@tremor/react";
+
+export default function ReportPage() {
+  const { isAuthenticated, isLoading: isAuthLoading, error: authError } = useTelegramAuth();
+  const { data: transactions, isLoading: isDataLoading, error: dataError } = useTransactions();
+  const [isFilterBulanIni, setIsFilterBulanIni] = useState(false);
+
+  const [userData, setUserData] = useState<any>(null);
+  useEffect(() => {
+    account.get().then(setUserData).catch(console.error);
+  }, []);
+
+  if (isAuthLoading) return <main className="min-h-screen p-8 flex justify-center items-center"><Loader2 className="animate-spin text-primary" /></main>;
+  if (authError && !isAuthenticated) return <main className="min-h-screen p-8 flex justify-center items-center">Akses Ditolak</main>;
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const filteredTransactions = transactions?.filter((t) => {
+    if (!isFilterBulanIni) return true; 
+    const tDate = new Date(t.transaction_date);
+    return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+  }) || [];
+
+  console.log("Data Transaksi Teratas:", filteredTransactions[0]);
+
+  const totalIncome = filteredTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = filteredTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+
+  const formatRupiah = (angka: number) => {
+    const nominal = new Intl.NumberFormat("id-ID", { style: "decimal", maximumFractionDigits: 0 }).format(angka);
+    return `Rp${nominal}`;
+  };
+
+  const chartDataMap: Record<string, any> = {};
+  const reversedTransactions = [...filteredTransactions].reverse();
+
+  reversedTransactions.forEach((t) => {
+    const dateObj = new Date(t.transaction_date);
+    const dateStr = dateObj.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    if (!chartDataMap[dateStr]) chartDataMap[dateStr] = { date: dateStr, Pemasukan: 0, Pengeluaran: 0 };
+    if (t.type === "income") chartDataMap[dateStr].Pemasukan += t.amount;
+    else if (t.type === "expense") chartDataMap[dateStr].Pengeluaran += t.amount;
+  });
+  const barChartData = Object.values(chartDataMap);
+
+  const expenseByCategory: Record<string, number> = {};
+  filteredTransactions.filter((t) => t.type === "expense").forEach((t) => {
+      const items = (t as any).transaction_item_id || [];
+      if (items.length > 0) {
+        items.forEach((item: any) => {
+          const categoryName = item.category_id?.name || "Lainnya";
+          if (!expenseByCategory[categoryName]) expenseByCategory[categoryName] = 0;
+          expenseByCategory[categoryName] += item.subtotal || 0; 
+        });
+      } else {
+        const fallbackCategory = t.notes || "Lainnya"; 
+        if (!expenseByCategory[fallbackCategory]) expenseByCategory[fallbackCategory] = 0;
+        expenseByCategory[fallbackCategory] += t.amount;
+      }
+    });
+  const donutChartData = Object.entries(expenseByCategory).map(([name, amount]) => ({ name, amount }));
+  const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <main className="min-h-screen p-4 md:p-8 flex flex-col items-center print:bg-white print:p-0">
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          @page { size: landscape; margin: 15mm; } 
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
+          .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+          .recharts-wrapper, .recharts-surface { overflow: visible !important; }
+        }
+      `}} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <div className="w-full max-w-5xl flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm print:hidden">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button 
+            variant={isFilterBulanIni ? "default" : "outline"}
+            className="flex gap-2 transition-all"
+            onClick={() => setIsFilterBulanIni(!isFilterBulanIni)}
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <Calendar className="h-4 w-4" />
+            {isFilterBulanIni ? `Bulan Ini (${monthName})` : "Semua Waktu"}
+          </Button>
+          <Button variant="outline" className="flex gap-2">
+            <Settings2 className="h-4 w-4" />
+            Opsi Data
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
+        <Button className="flex gap-2 font-semibold" onClick={() => window.print()}>
+          <Download className="h-4 w-4" />
+          Ekspor PDF
+        </Button>
+      </div>
+
+      {/* PERBAIKAN: Kertas diperlebar menjadi max-w-5xl agar tabel tidak sesak */}
+      <div className="w-full max-w-5xl bg-card text-card-foreground p-6 md:p-10 shadow-xl border rounded-sm min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none">
+        
+        {dataError && (
+          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2 print:hidden">
+            <AlertCircle className="h-5 w-5" />
+            <p className="font-medium">Gagal menarik data transaksi: {dataError.message}</p>
+          </div>
+        )}
+
+        <div className="border-b pb-6 mb-8 flex justify-between items-end print-avoid-break">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight print:text-2xl">Laporan Arus Kas</h1>
+            <p className="text-muted-foreground mt-2">
+              Periode: {isFilterBulanIni ? `1 ${monthName} - Selesai` : "Semua Waktu"}
+            </p>
+          </div>
+          <div className="text-right">
+            {/* Tampilkan Nama Akun Telegram, jika belum muat tampilkan "Gemmox AI" */}
+            <h2 className="text-xl font-bold text-primary print:text-lg">
+              {userData?.name || "Gemmbox AI"}
+            </h2>
+            
+            {/* Tampilkan ID Telegram (Hapus teks 'tg_' bawaan Appwrite agar bersih) */}
+            <p className="text-sm text-muted-foreground print:text-xs">
+              Telegram ID: {userData?.$id ? userData.$id.replace('tg_', '') : "Memuat..."}
+            </p>
+          </div>
+        </div>
+
+        {isDataLoading ? (
+          <div className="flex justify-center py-10 print:hidden"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="grid gap-8 print:gap-8">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4 print-avoid-break">
+              <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <h3 className="font-semibold">Total Pemasukan</h3>
+                </div>
+                <p className="text-3xl font-bold text-green-700 dark:text-green-500 print:text-2xl">{formatRupiah(totalIncome)}</p>
+              </div>
+
+              <div className="p-6 border rounded-xl bg-red-50/50 dark:bg-red-950/20 border-red-100 dark:border-red-900">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
+                  <TrendingDown className="h-5 w-5" />
+                  <h3 className="font-semibold">Total Pengeluaran</h3>
+                </div>
+                <p className="text-3xl font-bold text-red-700 dark:text-red-500 print:text-2xl">{formatRupiah(totalExpense)}</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-8 print:gap-8 print-avoid-break mt-4">
+               {/* PERBAIKAN: Kotak grafik dikembalikan seperti semula tanpa membuang padding */}
+               <div className="p-6 border rounded-xl flex flex-col justify-between">
+                 <div>
+                   <h3 className="text-lg font-semibold text-foreground print:text-base">Arus Kas Harian</h3>
+                   <p className="text-sm text-muted-foreground print:text-xs">Pemasukan vs Pengeluaran</p>
+                 </div>
+                 {barChartData.length > 0 ? (
+                   <BarChart className="mt-6 h-48 w-full print:h-44" data={barChartData} index="date" categories={["Pemasukan", "Pengeluaran"]} colors={["emerald", "red"]} valueFormatter={formatRupiah} yAxisWidth={110} showLegend={false} />
+                 ) : (
+                   <div className="mt-6 h-48 w-full flex items-center justify-center text-sm text-muted-foreground">Tidak ada data di periode ini</div>
+                 )}
+               </div>
+
+               <div className="p-6 border rounded-xl flex flex-col justify-between">
+                 <div>
+                   <h3 className="text-lg font-semibold text-foreground print:text-base">Rincian Pengeluaran</h3>
+                   <p className="text-sm text-muted-foreground print:text-xs">Berdasarkan Kategori</p>
+                 </div>
+                 {donutChartData.length > 0 ? (
+                   <DonutChart className="mt-6 h-48 w-full print:h-44" data={donutChartData} category="amount" index="name" valueFormatter={formatRupiah} colors={["blue", "amber", "violet", "rose", "cyan", "emerald"]} />
+                 ) : (
+                   <div className="mt-6 h-48 w-full flex items-center justify-center text-sm text-muted-foreground">Belum ada pengeluaran</div>
+                 )}
+               </div>
+            </div>
+
+            <div className="mt-6 print-avoid-break">
+              <div className="border-b pb-4 mb-4">
+                <h3 className="text-lg font-semibold text-foreground print:text-base">Rincian Transaksi</h3>
+                <p className="text-sm text-muted-foreground print:text-xs">Riwayat lengkap aktivitas keuanganmu</p>
+              </div>
+              
+              {/* PERBAIKAN: Kotak tabel beserta margin & padding-nya dipertahankan penuh saat diprint! */}
+              <div className="border border-muted rounded-xl p-2 md:p-4 bg-muted/10">
+                <Table className="print:text-[11px]"> 
+                  <TableHead>
+                    <TableRow className="border-b border-muted bg-muted/50">
+                      <TableHeaderCell className="text-muted-foreground font-semibold w-10 text-center">No</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold">Tanggal</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold">Kategori</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold">Dompet</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold">Catatan</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold text-center">Tipe</TableHeaderCell>
+                      <TableHeaderCell className="text-muted-foreground font-semibold text-right">Nominal</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredTransactions.map((t, index) => {
+                      const dateObj = new Date(t.transaction_date);
+                      const dateStr = dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                      const isIncome = t.type === "income";
+
+                      // LOGIKA KATEGORI
+                      const items = (t as any).transaction_items || (t as any).transaction_item_id || (t as any).items || [];
+                      const categoriesList = items.map((item: any) => {
+                        const cat = item.category_id || item.categories || item.category;
+                        return cat?.name;
+                      }).filter(Boolean); 
+                      
+                      const uniqueCategories = Array.from(new Set(categoriesList));
+                      
+                      // KUNCI CERDAS: Jika relasi kosong, kita JADIKAN CATATAN (NOTES) SEBAGAI KATEGORI!
+                      const categoryStr = uniqueCategories.length > 0 
+                        ? uniqueCategories.join(", ") 
+                        : (t.notes ? t.notes : "Tanpa Kategori");
+                      
+                      // LOGIKA DOMPET
+                      const walletObj = (t as any).wallets || (t as any).wallet_id || (t as any).wallet;
+                      let walletName = "-";
+                      
+                      // KUNCI CERDAS: Jika Appwrite hanya mengembalikan teks ID "wallet_xxx", kita beri nama default
+                      if (typeof walletObj === 'string' && walletObj.startsWith('wallet_')) {
+                         // Karena kita belum menarik data tabel wallets, kita samarkan dulu ID-nya
+                         walletName = "Dompet Utama";
+                      } else if (walletObj?.wallet_name) {
+                         walletName = walletObj.wallet_name;
+                      }
+
+                      return (
+                        <TableRow key={t.$id} className="hover:bg-muted/30 transition-colors print-avoid-break">
+                          <TableCell className="text-sm print:text-[11px] text-muted-foreground text-center print:py-2">{index + 1}</TableCell>
+                          <TableCell className="text-sm print:text-[11px] whitespace-normal min-w-[120px] print:min-w-0 print:py-2">{dateStr}</TableCell>
+                          <TableCell className="text-sm print:text-[11px] text-muted-foreground whitespace-normal min-w-[120px] print:min-w-0 print:py-2">{categoryStr}</TableCell>
+                          <TableCell className="text-sm print:text-[11px] font-medium whitespace-normal print:py-2">{walletName}</TableCell>
+                          <TableCell className="print:py-2">
+                            {/* Memastikan teks bisa turun ke bawah saat PDF agar tidak menabrak batas */}
+                            <div className="text-sm print:text-[11px] text-muted-foreground max-w-[120px] md:max-w-[160px] print:max-w-[200px] overflow-hidden text-ellipsis print:whitespace-normal whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
+                          </TableCell>
+                          <TableCell className="text-center print:py-2">
+                            <Badge color={isIncome ? "emerald" : "red"} size="sm" className="print:text-[9px] print:px-1">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-sm print:text-[11px] whitespace-nowrap print:py-2">
+                            <span className={isIncome ? "text-emerald-600 dark:text-emerald-500" : "text-red-600 dark:text-red-500"}>
+                              {isIncome ? "+" : "-"} {formatRupiah(t.amount)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                
+                {filteredTransactions.length === 0 && (
+                  <div className="py-10 text-center text-muted-foreground text-sm print:hidden">
+                    Belum ada data transaksi untuk periode ini.
+                  </div>
+                )}
+              </div>
+            </div>
+            
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER CREDIT (Hanya tampil di Web, hilang saat jadi PDF) */}
+      <div className="mt-8 mb-4 text-sm text-muted-foreground flex items-center gap-1 print:mt-4 print:text-xs">
+        Made with <span className="text-red-500 animate-pulse print:animate-none">❤️</span> by{" "}
+        <a 
+          href="https://amalindipo.id" 
+          target="_blank" 
           rel="noopener noreferrer"
+          className="font-semibold text-primary hover:underline hover:text-primary/80 transition-all print:text-black print:no-underline"
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
+          Dipoengoro
         </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
