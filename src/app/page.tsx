@@ -10,15 +10,10 @@ import { account, storage } from "@/lib/appwrite";
 import { BarChart, DonutChart, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge } from "@tremor/react";
 
 export default function ReportPage() {
-  const { isAuthenticated, isLoading: isAuthLoading, error: authError } = useTelegramAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, error: authError, user } = useTelegramAuth();
   const { data: transactions, isLoading: isDataLoading, error: dataError } = useTransactions();
   const [isFilterBulanIni, setIsFilterBulanIni] = useState(false);
-  const [isExporting, setIsExporting] = useState(false); // State untuk loading PDF
-
-  const [userData, setUserData] = useState<any>(null);
-  useEffect(() => {
-    account.get().then(setUserData).catch(console.error);
-  }, []);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Fungsi VIP: Kirim PDF via Bot Telegram
   const handleExportPDF = async () => {
@@ -31,43 +26,38 @@ export default function ReportPage() {
       if (!element) throw new Error("Gagal memuat area laporan.");
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
+      
+      // PENGATURAN PDF YANG SUDAH SEMPURNA
       const opt: any = {
-        margin:       10, // <--- KITA KEMBALIKAN 10mm BIAR RAPI DI SEMUA HALAMAN
+        margin:       10, 
         filename:     fileName,
         image:        { type: 'jpeg', quality: 1 },
         html2canvas:  { scale: 2, useCORS: true, windowWidth: 1024 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak:    { mode: ['css', 'legacy'], before: ['.page-break-before'] }
+        pagebreak:    { mode: ['css', 'legacy'], before: ['.page-break-before'], avoid: ['tr'] }
       };
 
-      // 1. Buat PDF (Blob)
       const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      // 2. Upload ke Appwrite Storage (Bucket ID: "reports")
+      // Upload ke Appwrite Storage
       const uploadedFile = await storage.createFile("reports", ID.unique(), file);
-
-      // 3. Dapatkan Link Publik dari Appwrite
       const fileUrl = storage.getFileDownload("reports", uploadedFile.$id).toString();
 
-      // 4. Dapatkan Telegram ID pengguna saat ini
-      const tgId = userData?.$id ? userData.$id.replace('tg_', '') : null;
+      // Dapatkan Telegram ID
+      const tgId = user?.$id ? user.$id.replace('tg_', '') : null;
       if (!tgId) throw new Error("ID Telegram tidak terdeteksi");
 
-      // 5. Panggil backend untuk menyuruh Bot mengirim pesan
+      // Panggil backend Telegram
       const response = await fetch('/api/send-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: tgId,
-          fileUrl: fileUrl
-        })
+        body: JSON.stringify({ telegramId: tgId, fileUrl: fileUrl })
       });
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
 
-      // 6. Sukses! Kasih tau user lewat popup Telegram
       // @ts-ignore
       if (window?.Telegram?.WebApp) {
          // @ts-ignore
@@ -78,7 +68,7 @@ export default function ReportPage() {
 
     } catch (error) {
       console.error("Gagal mengirim PDF:", error);
-      alert("Terjadi kesalahan saat mencetak PDF.");
+      alert("Terjadi kesalahan saat mengekspor PDF.");
     } finally {
       setIsExporting(false);
     }
@@ -136,9 +126,10 @@ export default function ReportPage() {
   const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
   return (
+    // DIKEMBALIKAN: overflow-x-auto agar di HP bisa digeser ke kanan seperti PDF asli
     <main className="min-h-screen p-8 overflow-x-auto bg-muted/10">
       
-      {/* KONTROL ATAS - TIDAK IKUT DIPRINT KARENA DI LUAR ID="report-container" */}
+      {/* DIKEMBALIKAN: Lebar dikunci mutlak di w-[1024px] */}
       <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm">
         <div className="flex items-center gap-2">
           <Button 
@@ -155,23 +146,14 @@ export default function ReportPage() {
           </Button>
         </div>
         
-        {/* TOMBOL EXPORT BARU */}
-        <Button 
-          className="flex gap-2 font-semibold" 
-          onClick={handleExportPDF}
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
+        <Button className="flex gap-2 font-semibold" onClick={handleExportPDF} disabled={isExporting}>
+          {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           {isExporting ? "Memproses PDF..." : "Ekspor PDF"}
         </Button>
       </div>
 
-      {/* AREA YANG AKAN DI-RENDER JADI PDF (Bungkus dengan id="report-container") */}
-      <div id="report-container" className={`w-full max-w-5xl bg-card text-card-foreground min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none ${isExporting ? 'p-0 shadow-none border-none' : 'p-6 md:p-10 shadow-xl border rounded-sm'}`}>
+      {/* DIKEMBALIKAN: Lebar dikunci di w-[1024px]. Dilengkapi trik copot padding isExporting */}
+      <div id="report-container" className={`w-[1024px] mx-auto bg-card text-card-foreground min-h-[1056px] ${isExporting ? 'p-0 shadow-none border-none' : 'p-10 shadow-xl border rounded-sm'}`}>
         
         {dataError && (
           <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2">
@@ -189,10 +171,10 @@ export default function ReportPage() {
           </div>
           <div className="text-right">
             <h2 className="text-xl font-bold text-primary">
-              {userData?.name || "Gemmbox AI"}
+              {user?.name || "Gemmbox AI"}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Telegram ID: {userData?.$id ? userData.$id.replace('tg_', '') : "Memuat..."}
+              Telegram ID: {user?.$id ? user.$id.replace('tg_', '') : "Memuat..."}
             </p>
           </div>
         </div>
@@ -202,6 +184,7 @@ export default function ReportPage() {
         ) : (
           <div className="grid gap-8">
             
+            {/* DIKEMBALIKAN: Selalu 2 kolom bersebelahan, tidak akan menumpuk */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
@@ -246,6 +229,7 @@ export default function ReportPage() {
                </div>
             </div>
 
+            {/* Titik Lompat PDF */}
             <div className={`page-break-before ${isExporting ? 'mt-0' : 'mt-6'}`}>
               <div className="border-b pb-4 mb-4">
                 <h3 className="text-lg font-semibold text-foreground">Rincian Transaksi</h3>
@@ -276,16 +260,11 @@ export default function ReportPage() {
                         const cat = item.category_id || item.categories || item.category;
                         return cat?.name;
                       }).filter(Boolean); 
-                      
                       const uniqueCategories = Array.from(new Set(categoriesList));
-                      
-                      const categoryStr = uniqueCategories.length > 0 
-                        ? uniqueCategories.join(", ") 
-                        : (t.notes ? t.notes : "Tanpa Kategori");
+                      const categoryStr = uniqueCategories.length > 0 ? uniqueCategories.join(", ") : (t.notes ? t.notes : "Tanpa Kategori");
                       
                       const walletObj = (t as any).wallets || (t as any).wallet_id || (t as any).wallet;
                       let walletName = "-";
-                      
                       if (typeof walletObj === 'string' && walletObj.startsWith('wallet_')) {
                          walletName = "Dompet Utama";
                       } else if (walletObj?.wallet_name) {
@@ -295,11 +274,14 @@ export default function ReportPage() {
                       return (
                         <TableRow key={t.$id} className="hover:bg-muted/30 transition-colors">
                           <TableCell className="text-sm text-muted-foreground text-center">{index + 1}</TableCell>
-                          <TableCell className="text-sm whitespace-normal min-w-[120px]">{dateStr}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground whitespace-normal min-w-[120px]">{categoryStr}</TableCell>
-                          <TableCell className="text-sm font-medium whitespace-normal">{walletName}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{dateStr}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{categoryStr}</TableCell>
+                          <TableCell className="text-sm font-medium">{walletName}</TableCell>
                           <TableCell>
-                            <div className="text-sm text-muted-foreground max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
+                            {/* DIKEMBALIKAN: max-w diperbesar dan dibebaskan saat print agar tidak kepotong */}
+                            <div className={`text-sm text-muted-foreground ${isExporting ? 'whitespace-normal' : 'max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap'}`} title={t.notes || "-"}>
+                              {t.notes || "-"}
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge color={isIncome ? "emerald" : "red"} size="sm">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
@@ -316,7 +298,7 @@ export default function ReportPage() {
                 </Table>
                 
                 {filteredTransactions.length === 0 && (
-                    <div className="py-10 text-center text-muted-foreground text-sm">
+                  <div className="py-10 text-center text-muted-foreground text-sm">
                     Belum ada data transaksi untuk periode ini.
                   </div>
                 )}
