@@ -31,8 +31,6 @@ export default function ReportPage() {
     return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
   }) || [];
 
-  console.log("Data Transaksi Teratas:", filteredTransactions[0]);
-
   const totalIncome = filteredTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = filteredTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
 
@@ -72,7 +70,8 @@ export default function ReportPage() {
   const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
   return (
-    <main className="min-h-screen p-4 md:p-8 flex flex-col items-center print:bg-white print:p-0">
+    // DI SINI KITA TAMBAHKAN overflow-x-auto AGAR BISA DI-SCROLL KE KANAN DI HP
+    <main className="min-h-screen p-8 overflow-x-auto bg-muted/10 print:bg-white print:p-0">
       
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
@@ -83,8 +82,9 @@ export default function ReportPage() {
         }
       `}} />
 
-      <div className="w-full max-w-5xl flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm print:hidden">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* LEBAR DIKUNCI DI 1024px */}
+      <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm print:hidden">
+        <div className="flex items-center gap-2">
           <Button 
             variant={isFilterBulanIni ? "default" : "outline"}
             className="flex gap-2 transition-all"
@@ -104,8 +104,8 @@ export default function ReportPage() {
         </Button>
       </div>
 
-      {/* PERBAIKAN: Kertas diperlebar menjadi max-w-5xl agar tabel tidak sesak */}
-      <div className="w-full max-w-5xl bg-card text-card-foreground p-6 md:p-10 shadow-xl border rounded-sm min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none">
+      {/* LEBAR KERTAS DIKUNCI DI 1024px */}
+      <div className="w-[1024px] mx-auto bg-card text-card-foreground p-10 shadow-xl border rounded-sm min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none">
         
         {dataError && (
           <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2 print:hidden">
@@ -122,12 +122,9 @@ export default function ReportPage() {
             </p>
           </div>
           <div className="text-right">
-            {/* Tampilkan Nama Akun Telegram, jika belum muat tampilkan "Gemmox AI" */}
             <h2 className="text-xl font-bold text-primary print:text-lg">
               {userData?.name || "Gemmbox AI"}
             </h2>
-            
-            {/* Tampilkan ID Telegram (Hapus teks 'tg_' bawaan Appwrite agar bersih) */}
             <p className="text-sm text-muted-foreground print:text-xs">
               Telegram ID: {userData?.$id ? userData.$id.replace('tg_', '') : "Memuat..."}
             </p>
@@ -139,7 +136,8 @@ export default function ReportPage() {
         ) : (
           <div className="grid gap-8 print:gap-8">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4 print-avoid-break">
+            {/* GRID DIBIKIN FIX 2 KOLOM, TIDAK NUMPUK */}
+            <div className="grid grid-cols-2 gap-4 print-avoid-break">
               <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
                   <TrendingUp className="h-5 w-5" />
@@ -157,8 +155,8 @@ export default function ReportPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-8 print:gap-8 print-avoid-break mt-4">
-               {/* PERBAIKAN: Kotak grafik dikembalikan seperti semula tanpa membuang padding */}
+            {/* GRID DIBIKIN FIX 2 KOLOM, TIDAK NUMPUK */}
+            <div className="grid grid-cols-2 gap-8 print-avoid-break mt-4">
                <div className="p-6 border rounded-xl flex flex-col justify-between">
                  <div>
                    <h3 className="text-lg font-semibold text-foreground print:text-base">Arus Kas Harian</h3>
@@ -190,8 +188,7 @@ export default function ReportPage() {
                 <p className="text-sm text-muted-foreground print:text-xs">Riwayat lengkap aktivitas keuanganmu</p>
               </div>
               
-              {/* PERBAIKAN: Kotak tabel beserta margin & padding-nya dipertahankan penuh saat diprint! */}
-              <div className="border border-muted rounded-xl p-2 md:p-4 bg-muted/10">
+              <div className="border border-muted rounded-xl p-4 bg-muted/10">
                 <Table className="print:text-[11px]"> 
                   <TableHead>
                     <TableRow className="border-b border-muted bg-muted/50">
@@ -210,7 +207,6 @@ export default function ReportPage() {
                       const dateStr = dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
                       const isIncome = t.type === "income";
 
-                      // LOGIKA KATEGORI
                       const items = (t as any).transaction_items || (t as any).transaction_item_id || (t as any).items || [];
                       const categoriesList = items.map((item: any) => {
                         const cat = item.category_id || item.categories || item.category;
@@ -219,18 +215,14 @@ export default function ReportPage() {
                       
                       const uniqueCategories = Array.from(new Set(categoriesList));
                       
-                      // KUNCI CERDAS: Jika relasi kosong, kita JADIKAN CATATAN (NOTES) SEBAGAI KATEGORI!
                       const categoryStr = uniqueCategories.length > 0 
                         ? uniqueCategories.join(", ") 
                         : (t.notes ? t.notes : "Tanpa Kategori");
                       
-                      // LOGIKA DOMPET
                       const walletObj = (t as any).wallets || (t as any).wallet_id || (t as any).wallet;
                       let walletName = "-";
                       
-                      // KUNCI CERDAS: Jika Appwrite hanya mengembalikan teks ID "wallet_xxx", kita beri nama default
                       if (typeof walletObj === 'string' && walletObj.startsWith('wallet_')) {
-                         // Karena kita belum menarik data tabel wallets, kita samarkan dulu ID-nya
                          walletName = "Dompet Utama";
                       } else if (walletObj?.wallet_name) {
                          walletName = walletObj.wallet_name;
@@ -243,8 +235,7 @@ export default function ReportPage() {
                           <TableCell className="text-sm print:text-[11px] text-muted-foreground whitespace-normal min-w-[120px] print:min-w-0 print:py-2">{categoryStr}</TableCell>
                           <TableCell className="text-sm print:text-[11px] font-medium whitespace-normal print:py-2">{walletName}</TableCell>
                           <TableCell className="print:py-2">
-                            {/* Memastikan teks bisa turun ke bawah saat PDF agar tidak menabrak batas */}
-                            <div className="text-sm print:text-[11px] text-muted-foreground max-w-[120px] md:max-w-[160px] print:max-w-[200px] overflow-hidden text-ellipsis print:whitespace-normal whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
+                            <div className="text-sm print:text-[11px] text-muted-foreground max-w-[160px] print:max-w-[200px] overflow-hidden text-ellipsis print:whitespace-normal whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
                           </TableCell>
                           <TableCell className="text-center print:py-2">
                             <Badge color={isIncome ? "emerald" : "red"} size="sm" className="print:text-[9px] print:px-1">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
@@ -272,8 +263,7 @@ export default function ReportPage() {
         )}
       </div>
 
-      {/* FOOTER CREDIT (Hanya tampil di Web, hilang saat jadi PDF) */}
-      <div className="mt-8 mb-4 text-sm text-muted-foreground flex items-center gap-1 print:mt-4 print:text-xs">
+      <div className="w-[1024px] mx-auto mt-8 mb-4 text-sm text-muted-foreground flex items-center gap-1 print:mt-4 print:text-xs">
         Made with <span className="text-red-500 animate-pulse print:animate-none">❤️</span> by{" "}
         <a 
           href="https://amalindipo.id" 
