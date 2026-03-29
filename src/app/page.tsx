@@ -20,19 +20,29 @@ export default function ReportPage() {
   }, []);
 
   // Fungsi untuk Ekspor PDF
+  // Fungsi untuk Ekspor PDF
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
       // Import dinamis agar tidak error saat SSR Next.js
+      // @ts-ignore
       const html2pdf = (await import("html2pdf.js")).default;
       const element = document.getElementById("report-container");
       
-      const opt = {
-        margin:       [10, 10, 10, 10], // Margin dalam mm
+      // PERBAIKAN ELEMENT: Cegah error jika elemen null
+      if (!element) {
+        alert("Gagal memuat area laporan.");
+        setIsExporting(false);
+        return;
+      }
+
+      // PERBAIKAN OPT: Tambahkan ": any" agar TypeScript berhenti rewel
+      const opt: any = {
+        margin:       10,
         filename:     `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' } // Pakai A3 landscape biar 1024px muat
+        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
       };
 
       await html2pdf().set(opt).from(element).save();
