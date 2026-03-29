@@ -32,24 +32,23 @@ export default function ReportPage() {
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
-        // [Atas, Kanan, Bawah, Kiri] - Margin diperkecil agar lega di lanskap
-        margin:       [5, 5, 5, 5], 
+        margin:       0, // <--- KITA NOL-KAN MARGINNYA! Pakai padding bawaan web
         filename:     fileName,
-        image:        { type: 'jpeg', quality: 1 }, // Kualitas digas ke 100%
+        image:        { type: 'jpeg', quality: 1 },
         html2canvas:  { 
           scale: 2, 
           useCORS: true,
-          windowWidth: 1024 // Kunci lebar kanvas agar pas dengan layout 1024px
+          windowWidth: 1024 
         },
         jsPDF:        { 
           unit: 'mm', 
-          format: 'a4', // Ukuran kertas A4
-          orientation: 'landscape' // <--- KEMBALI KE LANSKAP (MEMANJANG KESAMPING)
+          format: 'a4', 
+          orientation: 'landscape' 
         },
-        // Aturan Page Break: Cegah baris tabel (tr) terpotong
         pagebreak:    { 
           mode: ['css', 'legacy'], 
-          avoid: ['tr', '.print-avoid-break'] 
+          avoid: ['tr', '.print-avoid-break'],
+          before: ['.page-break-before'] // <--- ATURAN BARU: Lompat halaman sebelum elemen ini
         }
       };
 
@@ -259,7 +258,7 @@ export default function ReportPage() {
                </div>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 page-break-before">
               <div className="border-b pb-4 mb-4">
                 <h3 className="text-lg font-semibold text-foreground">Rincian Transaksi</h3>
                 <p className="text-sm text-muted-foreground">Riwayat lengkap aktivitas keuanganmu</p>
