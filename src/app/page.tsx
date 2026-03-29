@@ -7,7 +7,7 @@ import { useTelegramAuth } from "@/hooks/useTelegramAuth";
 import { useTransactions } from "@/hooks/useTransactions";
 import { ID } from "appwrite";
 import { account, storage } from "@/lib/appwrite";
-import { BarChart, DonutChart, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge } from "@tremor/react";
+import { BarChart, DonutChart, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell } from "@tremor/react";
 
 export default function ReportPage() {
   const { isAuthenticated, isLoading: isAuthLoading, error: authError, user } = useTelegramAuth();
@@ -15,7 +15,6 @@ export default function ReportPage() {
   const [isFilterBulanIni, setIsFilterBulanIni] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Fungsi VIP: Kirim PDF via Bot Telegram
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
@@ -27,7 +26,6 @@ export default function ReportPage() {
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       
-      // PENGATURAN PDF YANG SUDAH SEMPURNA
       const opt: any = {
         margin:       10, 
         filename:     fileName,
@@ -40,15 +38,12 @@ export default function ReportPage() {
       const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      // Upload ke Appwrite Storage
       const uploadedFile = await storage.createFile("reports", ID.unique(), file);
       const fileUrl = storage.getFileDownload("reports", uploadedFile.$id).toString();
 
-      // Dapatkan Telegram ID
       const tgId = user?.$id ? user.$id.replace('tg_', '') : null;
       if (!tgId) throw new Error("ID Telegram tidak terdeteksi");
 
-      // Panggil backend Telegram
       const response = await fetch('/api/send-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,11 +121,10 @@ export default function ReportPage() {
   const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
   return (
-    // DIKEMBALIKAN: overflow-x-auto agar di HP bisa digeser ke kanan seperti PDF asli
-    <main className="min-h-screen p-8 overflow-x-auto bg-muted/10">
+    <main className="min-h-screen p-4 md:p-8 overflow-x-auto bg-muted/10">
       
-      {/* DIKEMBALIKAN: Lebar dikunci mutlak di w-[1024px] */}
-      <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm">
+      {/* PERBAIKAN: Pakai lg:mx-auto agar di HP rata kiri dan scroll-nya normal */}
+      <div className="w-[1024px] lg:mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm">
         <div className="flex items-center gap-2">
           <Button 
             variant={isFilterBulanIni ? "default" : "outline"}
@@ -152,8 +146,8 @@ export default function ReportPage() {
         </Button>
       </div>
 
-      {/* DIKEMBALIKAN: Lebar dikunci di w-[1024px]. Dilengkapi trik copot padding isExporting */}
-      <div id="report-container" className={`w-[1024px] mx-auto bg-card text-card-foreground min-h-[1056px] ${isExporting ? 'p-0 shadow-none border-none' : 'p-10 shadow-xl border rounded-sm'}`}>
+      {/* PERBAIKAN: Pakai lg:mx-auto */}
+      <div id="report-container" className={`w-[1024px] lg:mx-auto bg-card text-card-foreground min-h-[1056px] ${isExporting ? 'p-0 shadow-none border-none' : 'p-10 shadow-xl border rounded-sm'}`}>
         
         {dataError && (
           <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2">
@@ -184,7 +178,6 @@ export default function ReportPage() {
         ) : (
           <div className="grid gap-8">
             
-            {/* DIKEMBALIKAN: Selalu 2 kolom bersebelahan, tidak akan menumpuk */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
@@ -229,7 +222,6 @@ export default function ReportPage() {
                </div>
             </div>
 
-            {/* Titik Lompat PDF */}
             <div className={`page-break-before ${isExporting ? 'mt-0' : 'mt-6'}`}>
               <div className="border-b pb-4 mb-4">
                 <h3 className="text-lg font-semibold text-foreground">Rincian Transaksi</h3>
@@ -278,13 +270,15 @@ export default function ReportPage() {
                           <TableCell className="text-sm text-muted-foreground">{categoryStr}</TableCell>
                           <TableCell className="text-sm font-medium">{walletName}</TableCell>
                           <TableCell>
-                            {/* DIKEMBALIKAN: max-w diperbesar dan dibebaskan saat print agar tidak kepotong */}
                             <div className={`text-sm text-muted-foreground ${isExporting ? 'whitespace-normal' : 'max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap'}`} title={t.notes || "-"}>
                               {t.notes || "-"}
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge color={isIncome ? "emerald" : "red"} size="sm">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
+                            {/* PERBAIKAN: Badge diganti dengan Span Native Tailwind agar render PDF 100% mulus */}
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium ${isIncome ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                              {isIncome ? "Pemasukan" : "Pengeluaran"}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right font-medium text-sm whitespace-nowrap">
                             <span className={isIncome ? "text-emerald-600 dark:text-emerald-500" : "text-red-600 dark:text-red-500"}>
@@ -309,7 +303,8 @@ export default function ReportPage() {
         )}
       </div>
 
-      <div className="w-[1024px] mx-auto mt-8 mb-4 text-center">
+      {/* PERBAIKAN: Pakai lg:mx-auto */}
+      <div className="w-[1024px] lg:mx-auto mt-8 mb-4 text-center">
         <span className="text-base text-foreground">Made with </span>
         <span className="text-base text-red-500">❤️</span>
         <span className="text-base text-foreground"> by </span>
