@@ -70,7 +70,6 @@ export default function ReportPage() {
   const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
   return (
-    // DI SINI KITA TAMBAHKAN overflow-x-auto AGAR BISA DI-SCROLL KE KANAN DI HP
     <main className="min-h-screen p-8 overflow-x-auto bg-muted/10 print:bg-white print:p-0">
       
       <style dangerouslySetInnerHTML={{__html: `
@@ -82,7 +81,6 @@ export default function ReportPage() {
         }
       `}} />
 
-      {/* LEBAR DIKUNCI DI 1024px */}
       <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm print:hidden">
         <div className="flex items-center gap-2">
           <Button 
@@ -104,7 +102,6 @@ export default function ReportPage() {
         </Button>
       </div>
 
-      {/* LEBAR KERTAS DIKUNCI DI 1024px */}
       <div className="w-[1024px] mx-auto bg-card text-card-foreground p-10 shadow-xl border rounded-sm min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none">
         
         {dataError && (
@@ -136,7 +133,6 @@ export default function ReportPage() {
         ) : (
           <div className="grid gap-8 print:gap-8">
             
-            {/* GRID DIBIKIN FIX 2 KOLOM, TIDAK NUMPUK */}
             <div className="grid grid-cols-2 gap-4 print-avoid-break">
               <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
@@ -155,7 +151,6 @@ export default function ReportPage() {
               </div>
             </div>
             
-            {/* GRID DIBIKIN FIX 2 KOLOM, TIDAK NUMPUK */}
             <div className="grid grid-cols-2 gap-8 print-avoid-break mt-4">
                <div className="p-6 border rounded-xl flex flex-col justify-between">
                  <div>
@@ -252,7 +247,7 @@ export default function ReportPage() {
                 </Table>
                 
                 {filteredTransactions.length === 0 && (
-                  <div className="py-10 text-center text-muted-foreground text-sm print:hidden">
+                    <div className="py-10 text-center text-muted-foreground text-sm print:hidden">
                     Belum ada data transaksi untuk periode ini.
                   </div>
                 )}
@@ -263,8 +258,16 @@ export default function ReportPage() {
         )}
       </div>
 
-      <div className="w-[1024px] mx-auto mt-8 mb-4 text-sm text-muted-foreground flex items-center gap-1 print:mt-4 print:text-xs">
-        Made with <span className="text-red-500 animate-pulse print:animate-none">❤️</span> by{" "}
+      {/* FOOTER - PERBAIKAN DI SINI */}
+      {/* 1. Menghapus 'flex items-center gap-1' karena bikin aneh di mobile peramban.
+         2. Menambahkan 'text-center' agar konten teks didalam 1024px ini rata tengah.
+      */}
+      <div className="w-[1024px] mx-auto mt-8 mb-4 text-sm text-center text-muted-foreground print:mt-4 print:text-xs">
+        Made with{" "}
+        <span className="text-red-500 animate-pulse print:animate-none">
+          ❤️
+        </span>{" "}
+        by{" "}
         <a 
           href="https://amalindipo.id" 
           target="_blank" 
