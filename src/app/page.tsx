@@ -32,11 +32,25 @@ export default function ReportPage() {
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
-        margin:       10,
+        // [Atas, Kanan, Bawah, Kiri] - Margin diperkecil agar tidak tebal
+        margin:       [15, 5, 15, 5], 
         filename:     fileName,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
+        image:        { type: 'jpeg', quality: 1 }, // Kualitas digas ke 100%
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true,
+          windowWidth: 1024 // Kunci paksa lebar kanvas agar tidak pecah/sesak
+        },
+        jsPDF:        { 
+          unit: 'mm', 
+          format: 'a4', // Kita pakai A4 biasa
+          orientation: 'portrait' // Memanjang ke bawah agar natural
+        },
+        // INI KUNCI UTAMANYA: Mengajarkan html2pdf untuk tidak menebas baris tabel!
+        pagebreak:    { 
+          mode: ['css', 'legacy'], 
+          avoid: ['tr', '.print-avoid-break'] // tr = Table Row
+        }
       };
 
       // 1. Buat PDF (Blob)
