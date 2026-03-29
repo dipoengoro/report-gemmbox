@@ -258,21 +258,16 @@ export default function ReportPage() {
         )}
       </div>
 
-      {/* FOOTER - PERBAIKAN DI SINI */}
-      {/* 1. Menghapus 'flex items-center gap-1' karena bikin aneh di mobile peramban.
-         2. Menambahkan 'text-center' agar konten teks didalam 1024px ini rata tengah.
-      */}
-      <div className="w-[1024px] mx-auto mt-8 mb-4 text-sm text-center text-muted-foreground print:mt-4 print:text-xs">
-        Made with{" "}
-        <span className="text-red-500 animate-pulse print:animate-none">
-          ❤️
-        </span>{" "}
-        by{" "}
+      {/* FOOTER - PERBAIKAN STABILITAS MOBILE */}
+      <div className="w-[1024px] mx-auto mt-8 mb-4 text-center print:mt-4 print:text-xs">
+        <span className="text-base text-foreground">Made with </span>
+        <span className="text-base text-red-500">❤️</span>
+        <span className="text-base text-foreground"> by </span>
         <a 
           href="https://amalindipo.id" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="font-semibold text-primary hover:underline hover:text-primary/80 transition-all print:text-black print:no-underline"
+          className="text-base font-semibold text-primary hover:underline hover:text-primary/80 transition-all print:text-black print:no-underline"
         >
           Dipoengoro
         </a>
