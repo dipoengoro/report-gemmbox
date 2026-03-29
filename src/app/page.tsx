@@ -12,11 +12,37 @@ export default function ReportPage() {
   const { isAuthenticated, isLoading: isAuthLoading, error: authError } = useTelegramAuth();
   const { data: transactions, isLoading: isDataLoading, error: dataError } = useTransactions();
   const [isFilterBulanIni, setIsFilterBulanIni] = useState(false);
+  const [isExporting, setIsExporting] = useState(false); // State untuk loading PDF
 
   const [userData, setUserData] = useState<any>(null);
   useEffect(() => {
     account.get().then(setUserData).catch(console.error);
   }, []);
+
+  // Fungsi untuk Ekspor PDF
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      // Import dinamis agar tidak error saat SSR Next.js
+      const html2pdf = (await import("html2pdf.js")).default;
+      const element = document.getElementById("report-container");
+      
+      const opt = {
+        margin:       [10, 10, 10, 10], // Margin dalam mm
+        filename:     `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' } // Pakai A3 landscape biar 1024px muat
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error("Gagal mengekspor PDF:", error);
+      alert("Terjadi kesalahan saat mengekspor PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (isAuthLoading) return <main className="min-h-screen p-8 flex justify-center items-center"><Loader2 className="animate-spin text-primary" /></main>;
   if (authError && !isAuthenticated) return <main className="min-h-screen p-8 flex justify-center items-center">Akses Ditolak</main>;
@@ -70,18 +96,10 @@ export default function ReportPage() {
   const monthName = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
   return (
-    <main className="min-h-screen p-8 overflow-x-auto bg-muted/10 print:bg-white print:p-0">
+    <main className="min-h-screen p-8 overflow-x-auto bg-muted/10">
       
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          @page { size: landscape; margin: 15mm; } 
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
-          .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
-          .recharts-wrapper, .recharts-surface { overflow: visible !important; }
-        }
-      `}} />
-
-      <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm print:hidden">
+      {/* KONTROL ATAS - TIDAK IKUT DIPRINT KARENA DI LUAR ID="report-container" */}
+      <div className="w-[1024px] mx-auto flex items-center justify-between gap-4 mb-6 p-4 bg-background rounded-xl border shadow-sm">
         <div className="flex items-center gap-2">
           <Button 
             variant={isFilterBulanIni ? "default" : "outline"}
@@ -96,50 +114,61 @@ export default function ReportPage() {
             Opsi Data
           </Button>
         </div>
-        <Button className="flex gap-2 font-semibold" onClick={() => window.print()}>
-          <Download className="h-4 w-4" />
-          Ekspor PDF
+        
+        {/* TOMBOL EXPORT BARU */}
+        <Button 
+          className="flex gap-2 font-semibold" 
+          onClick={handleExportPDF}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {isExporting ? "Memproses PDF..." : "Ekspor PDF"}
         </Button>
       </div>
 
-      <div className="w-[1024px] mx-auto bg-card text-card-foreground p-10 shadow-xl border rounded-sm min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none">
+      {/* AREA YANG AKAN DI-RENDER JADI PDF (Bungkus dengan id="report-container") */}
+      <div id="report-container" className="w-[1024px] mx-auto bg-card text-card-foreground p-10 shadow-xl border rounded-sm min-h-[1056px]">
         
         {dataError && (
-          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2 print:hidden">
+          <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
             <p className="font-medium">Gagal menarik data transaksi: {dataError.message}</p>
           </div>
         )}
 
-        <div className="border-b pb-6 mb-8 flex justify-between items-end print-avoid-break">
+        <div className="border-b pb-6 mb-8 flex justify-between items-end">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight print:text-2xl">Laporan Arus Kas</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Laporan Arus Kas</h1>
             <p className="text-muted-foreground mt-2">
               Periode: {isFilterBulanIni ? `1 ${monthName} - Selesai` : "Semua Waktu"}
             </p>
           </div>
           <div className="text-right">
-            <h2 className="text-xl font-bold text-primary print:text-lg">
+            <h2 className="text-xl font-bold text-primary">
               {userData?.name || "Gemmbox AI"}
             </h2>
-            <p className="text-sm text-muted-foreground print:text-xs">
+            <p className="text-sm text-muted-foreground">
               Telegram ID: {userData?.$id ? userData.$id.replace('tg_', '') : "Memuat..."}
             </p>
           </div>
         </div>
 
         {isDataLoading ? (
-          <div className="flex justify-center py-10 print:hidden"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="grid gap-8 print:gap-8">
+          <div className="grid gap-8">
             
-            <div className="grid grid-cols-2 gap-4 print-avoid-break">
+            <div className="grid grid-cols-2 gap-4">
               <div className="p-6 border rounded-xl bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
                   <TrendingUp className="h-5 w-5" />
                   <h3 className="font-semibold">Total Pemasukan</h3>
                 </div>
-                <p className="text-3xl font-bold text-green-700 dark:text-green-500 print:text-2xl">{formatRupiah(totalIncome)}</p>
+                <p className="text-3xl font-bold text-green-700 dark:text-green-500">{formatRupiah(totalIncome)}</p>
               </div>
 
               <div className="p-6 border rounded-xl bg-red-50/50 dark:bg-red-950/20 border-red-100 dark:border-red-900">
@@ -147,18 +176,18 @@ export default function ReportPage() {
                   <TrendingDown className="h-5 w-5" />
                   <h3 className="font-semibold">Total Pengeluaran</h3>
                 </div>
-                <p className="text-3xl font-bold text-red-700 dark:text-red-500 print:text-2xl">{formatRupiah(totalExpense)}</p>
+                <p className="text-3xl font-bold text-red-700 dark:text-red-500">{formatRupiah(totalExpense)}</p>
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-8 print-avoid-break mt-4">
+            <div className="grid grid-cols-2 gap-8 mt-4">
                <div className="p-6 border rounded-xl flex flex-col justify-between">
                  <div>
-                   <h3 className="text-lg font-semibold text-foreground print:text-base">Arus Kas Harian</h3>
-                   <p className="text-sm text-muted-foreground print:text-xs">Pemasukan vs Pengeluaran</p>
+                   <h3 className="text-lg font-semibold text-foreground">Arus Kas Harian</h3>
+                   <p className="text-sm text-muted-foreground">Pemasukan vs Pengeluaran</p>
                  </div>
                  {barChartData.length > 0 ? (
-                   <BarChart className="mt-6 h-48 w-full print:h-44" data={barChartData} index="date" categories={["Pemasukan", "Pengeluaran"]} colors={["emerald", "red"]} valueFormatter={formatRupiah} yAxisWidth={110} showLegend={false} />
+                   <BarChart className="mt-6 h-48 w-full" data={barChartData} index="date" categories={["Pemasukan", "Pengeluaran"]} colors={["emerald", "red"]} valueFormatter={formatRupiah} yAxisWidth={110} showLegend={false} />
                  ) : (
                    <div className="mt-6 h-48 w-full flex items-center justify-center text-sm text-muted-foreground">Tidak ada data di periode ini</div>
                  )}
@@ -166,25 +195,25 @@ export default function ReportPage() {
 
                <div className="p-6 border rounded-xl flex flex-col justify-between">
                  <div>
-                   <h3 className="text-lg font-semibold text-foreground print:text-base">Rincian Pengeluaran</h3>
-                   <p className="text-sm text-muted-foreground print:text-xs">Berdasarkan Kategori</p>
+                   <h3 className="text-lg font-semibold text-foreground">Rincian Pengeluaran</h3>
+                   <p className="text-sm text-muted-foreground">Berdasarkan Kategori</p>
                  </div>
                  {donutChartData.length > 0 ? (
-                   <DonutChart className="mt-6 h-48 w-full print:h-44" data={donutChartData} category="amount" index="name" valueFormatter={formatRupiah} colors={["blue", "amber", "violet", "rose", "cyan", "emerald"]} />
+                   <DonutChart className="mt-6 h-48 w-full" data={donutChartData} category="amount" index="name" valueFormatter={formatRupiah} colors={["blue", "amber", "violet", "rose", "cyan", "emerald"]} />
                  ) : (
                    <div className="mt-6 h-48 w-full flex items-center justify-center text-sm text-muted-foreground">Belum ada pengeluaran</div>
                  )}
                </div>
             </div>
 
-            <div className="mt-6 print-avoid-break">
+            <div className="mt-6">
               <div className="border-b pb-4 mb-4">
-                <h3 className="text-lg font-semibold text-foreground print:text-base">Rincian Transaksi</h3>
-                <p className="text-sm text-muted-foreground print:text-xs">Riwayat lengkap aktivitas keuanganmu</p>
+                <h3 className="text-lg font-semibold text-foreground">Rincian Transaksi</h3>
+                <p className="text-sm text-muted-foreground">Riwayat lengkap aktivitas keuanganmu</p>
               </div>
               
               <div className="border border-muted rounded-xl p-4 bg-muted/10">
-                <Table className="print:text-[11px]"> 
+                <Table> 
                   <TableHead>
                     <TableRow className="border-b border-muted bg-muted/50">
                       <TableHeaderCell className="text-muted-foreground font-semibold w-10 text-center">No</TableHeaderCell>
@@ -224,18 +253,18 @@ export default function ReportPage() {
                       }
 
                       return (
-                        <TableRow key={t.$id} className="hover:bg-muted/30 transition-colors print-avoid-break">
-                          <TableCell className="text-sm print:text-[11px] text-muted-foreground text-center print:py-2">{index + 1}</TableCell>
-                          <TableCell className="text-sm print:text-[11px] whitespace-normal min-w-[120px] print:min-w-0 print:py-2">{dateStr}</TableCell>
-                          <TableCell className="text-sm print:text-[11px] text-muted-foreground whitespace-normal min-w-[120px] print:min-w-0 print:py-2">{categoryStr}</TableCell>
-                          <TableCell className="text-sm print:text-[11px] font-medium whitespace-normal print:py-2">{walletName}</TableCell>
-                          <TableCell className="print:py-2">
-                            <div className="text-sm print:text-[11px] text-muted-foreground max-w-[160px] print:max-w-[200px] overflow-hidden text-ellipsis print:whitespace-normal whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
+                        <TableRow key={t.$id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="text-sm text-muted-foreground text-center">{index + 1}</TableCell>
+                          <TableCell className="text-sm whitespace-normal min-w-[120px]">{dateStr}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-normal min-w-[120px]">{categoryStr}</TableCell>
+                          <TableCell className="text-sm font-medium whitespace-normal">{walletName}</TableCell>
+                          <TableCell>
+                            <div className="text-sm text-muted-foreground max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title={t.notes || "-"}>{t.notes || "-"}</div>
                           </TableCell>
-                          <TableCell className="text-center print:py-2">
-                            <Badge color={isIncome ? "emerald" : "red"} size="sm" className="print:text-[9px] print:px-1">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
+                          <TableCell className="text-center">
+                            <Badge color={isIncome ? "emerald" : "red"} size="sm">{isIncome ? "Pemasukan" : "Pengeluaran"}</Badge>
                           </TableCell>
-                          <TableCell className="text-right font-medium text-sm print:text-[11px] whitespace-nowrap print:py-2">
+                          <TableCell className="text-right font-medium text-sm whitespace-nowrap">
                             <span className={isIncome ? "text-emerald-600 dark:text-emerald-500" : "text-red-600 dark:text-red-500"}>
                               {isIncome ? "+" : "-"} {formatRupiah(t.amount)}
                             </span>
@@ -247,7 +276,7 @@ export default function ReportPage() {
                 </Table>
                 
                 {filteredTransactions.length === 0 && (
-                    <div className="py-10 text-center text-muted-foreground text-sm print:hidden">
+                    <div className="py-10 text-center text-muted-foreground text-sm">
                     Belum ada data transaksi untuk periode ini.
                   </div>
                 )}
@@ -258,8 +287,7 @@ export default function ReportPage() {
         )}
       </div>
 
-      {/* FOOTER - PERBAIKAN STABILITAS MOBILE */}
-      <div className="w-[1024px] mx-auto mt-8 mb-4 text-center print:mt-4 print:text-xs">
+      <div className="w-[1024px] mx-auto mt-8 mb-4 text-center">
         <span className="text-base text-foreground">Made with </span>
         <span className="text-base text-red-500">❤️</span>
         <span className="text-base text-foreground"> by </span>
@@ -267,7 +295,7 @@ export default function ReportPage() {
           href="https://amalindipo.id" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-base font-semibold text-primary hover:underline hover:text-primary/80 transition-all print:text-black print:no-underline"
+          className="text-base font-semibold text-primary hover:underline hover:text-primary/80 transition-all"
         >
           Dipoengoro
         </a>
