@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Download, Settings2, Loader2, AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { useTelegramAuth } from "@/hooks/useTelegramAuth";
 import { useTransactions } from "@/hooks/useTransactions";
-import { account } from "@/lib/appwrite";
+import { ID } from "appwrite";
+import { account, storage } from "@/lib/appwrite";
 import { BarChart, DonutChart, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge } from "@tremor/react";
 
 export default function ReportPage() {
@@ -19,20 +20,15 @@ export default function ReportPage() {
     account.get().then(setUserData).catch(console.error);
   }, []);
 
-  // Fungsi untuk Ekspor PDF
+  // Fungsi VIP: Kirim PDF via Bot Telegram
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      // Import dinamis agar tidak error saat SSR Next.js
       // @ts-ignore
       const html2pdf = (await import("html2pdf.js")).default;
       const element = document.getElementById("report-container");
       
-      if (!element) {
-        alert("Gagal memuat area laporan.");
-        setIsExporting(false);
-        return;
-      }
+      if (!element) throw new Error("Gagal memuat area laporan.");
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
@@ -43,43 +39,45 @@ export default function ReportPage() {
         jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
       };
 
-      // 1. Buat PDF dalam bentuk "Blob" (Data mentah di memori)
+      // 1. Buat PDF (Blob)
       const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      // 2. Gunakan fitur Share Bawaan HP (Sangat ampuh di Telegram Mini App)
-      if (navigator.share && navigator.canShare) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        
-        // Cek apakah perangkat mendukung share file
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              title: 'Laporan Keuangan Gemmbox',
-              files: [file]
-            });
-          } catch (shareError) {
-            console.log("Share dibatalkan oleh pengguna:", shareError);
-          }
-        } else {
-          // Fallback 1: Jika HP tidak mendukung share file, buka di tab baru
-          const pdfUrl = URL.createObjectURL(pdfBlob);
-          window.open(pdfUrl, '_blank');
-        }
+      // 2. Upload ke Appwrite Storage (Bucket ID: "reports")
+      const uploadedFile = await storage.createFile("reports", ID.unique(), file);
+
+      // 3. Dapatkan Link Publik dari Appwrite
+      const fileUrl = storage.getFileDownload("reports", uploadedFile.$id).toString();
+
+      // 4. Dapatkan Telegram ID pengguna saat ini
+      const tgId = userData?.$id ? userData.$id.replace('tg_', '') : null;
+      if (!tgId) throw new Error("ID Telegram tidak terdeteksi");
+
+      // 5. Panggil backend untuk menyuruh Bot mengirim pesan
+      const response = await fetch('/api/send-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: tgId,
+          fileUrl: fileUrl
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+
+      // 6. Sukses! Kasih tau user lewat popup Telegram
+      // @ts-ignore
+      if (window?.Telegram?.WebApp) {
+         // @ts-ignore
+         window.Telegram.WebApp.showAlert("✅ Berhasil! Silakan cek obrolan chat dengan Bot untuk mengunduh PDF-nya.");
       } else {
-        // Fallback 2: Jika diakses via PC/Laptop biasa, gunakan download normal
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = pdfUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(pdfUrl);
+         alert("✅ Berhasil dikirim ke Telegram!");
       }
 
     } catch (error) {
-      console.error("Gagal mengekspor PDF:", error);
-      alert("Terjadi kesalahan saat mengekspor PDF.");
+      console.error("Gagal mengirim PDF:", error);
+      alert("Terjadi kesalahan saat mencetak PDF.");
     } finally {
       setIsExporting(false);
     }
