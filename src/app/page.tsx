@@ -32,24 +32,12 @@ export default function ReportPage() {
 
       const fileName = `Laporan_Keuangan_${isFilterBulanIni ? 'Bulan_Ini' : 'Semua'}.pdf`;
       const opt: any = {
-        margin:       0, // <--- KITA NOL-KAN MARGINNYA! Pakai padding bawaan web
+        margin:       10, // <--- KITA KEMBALIKAN 10mm BIAR RAPI DI SEMUA HALAMAN
         filename:     fileName,
         image:        { type: 'jpeg', quality: 1 },
-        html2canvas:  { 
-          scale: 2, 
-          useCORS: true,
-          windowWidth: 1024 
-        },
-        jsPDF:        { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'landscape' 
-        },
-        pagebreak:    { 
-          mode: ['css', 'legacy'], 
-          avoid: ['tr', '.print-avoid-break'],
-          before: ['.page-break-before'] // <--- ATURAN BARU: Lompat halaman sebelum elemen ini
-        }
+        html2canvas:  { scale: 2, useCORS: true, windowWidth: 1024 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak:    { mode: ['css', 'legacy'], before: ['.page-break-before'] }
       };
 
       // 1. Buat PDF (Blob)
@@ -183,7 +171,7 @@ export default function ReportPage() {
       </div>
 
       {/* AREA YANG AKAN DI-RENDER JADI PDF (Bungkus dengan id="report-container") */}
-      <div id="report-container" className="w-[1024px] mx-auto bg-card text-card-foreground p-10 shadow-xl border rounded-sm min-h-[1056px]">
+      <div id="report-container" className={`w-full max-w-5xl bg-card text-card-foreground min-h-[1056px] print:shadow-none print:border-none print:m-0 print:max-w-none ${isExporting ? 'p-0 shadow-none border-none' : 'p-6 md:p-10 shadow-xl border rounded-sm'}`}>
         
         {dataError && (
           <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive flex items-center gap-2">
@@ -258,7 +246,7 @@ export default function ReportPage() {
                </div>
             </div>
 
-            <div className="mt-6 page-break-before">
+            <div className={`page-break-before ${isExporting ? 'mt-0' : 'mt-6'}`}>
               <div className="border-b pb-4 mb-4">
                 <h3 className="text-lg font-semibold text-foreground">Rincian Transaksi</h3>
                 <p className="text-sm text-muted-foreground">Riwayat lengkap aktivitas keuanganmu</p>
