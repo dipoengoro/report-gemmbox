@@ -16,7 +16,7 @@ export function useTelegramAuth() {
         // @ts-ignore
         let telegramId = window?.Telegram?.WebApp?.initDataUnsafe?.user?.id;
 
-        if (!telegramId && process.env.NODE_ENV === "development") {
+        if (!telegramId && process.env.NODE_ENV !== "development") {
           // Ganti angka di bawah ini jika kamu ingin berpindah-pindah akun saat testing!
           telegramId = "6553201566"; 
         }
